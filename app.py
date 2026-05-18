@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 
 # Configuração da página
 st.set_page_config(page_title="Portal Futurista de Vendas", layout="wide")
@@ -49,7 +48,7 @@ if file_vendas and file_estab:
     min_date = df["dtInclusao"].min()
     max_date = df["dtInclusao"].max()
 
-    # Agora apenas uma data inicial
+    # Apenas uma data inicial
     data_inicio = st.sidebar.date_input(
         "📅 Mostrar clientes instalados a partir de:",
         value=min_date,
@@ -66,46 +65,25 @@ if file_vendas and file_estab:
     df_vendas_unicas = df.drop_duplicates(subset=["Id_Venda"])
 
     total_vendas = df_vendas_unicas.shape[0]
-    volume_total = df_vendas_unicas["Bruto"].sum()
-    ticket_medio = volume_total / total_vendas if total_vendas > 0 else 0
+    total_estab = df_clientes_filtrados["cnpjEmpresa"].nunique()
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     col1.metric("🛒 Vendas Únicas", f"{total_vendas}")
-    col2.metric("💰 Volume Bruto", f"R$ {volume_total:,.2f}")
-    col3.metric("📊 Ticket Médio", f"R$ {ticket_medio:,.2f}")
-
-    # --- PERFORMANCE POR EMPRESA ---
-    st.subheader("🚀 Performance por Estabelecimento")
-    df_perf = df_vendas_unicas.groupby(["Cnpj", "descFantasia", "dtInclusao"]).agg(
-        Qtd_Vendas=("Id_Venda", "count"),
-        Total_Bruto=("Bruto", "sum")
-    ).reset_index()
-
-    df_perf = df_perf.sort_values(by="Qtd_Vendas", ascending=False)
-
-    fig = px.bar(
-        df_perf.head(10),  # reduzido para Top 10
-        x="descFantasia",
-        y="Qtd_Vendas",
-        color="Total_Bruto",
-        title="Top 10 Clientes por Quantidade de Vendas",
-        labels={"descFantasia": "Estabelecimento", "Qtd_Vendas": "Quantidade de Vendas"},
-        color_continuous_scale="turbo"
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    col2.metric("🏢 Estabelecimentos Avaliados", f"{total_estab}")
 
     # --- CLIENTES DE BAIXA PERFORMANCE ---
     st.markdown("---")
     st.subheader("⚠️ Clientes com Baixa Performance")
 
     limite_vendas = st.slider("Ver clientes com menos vendas que:", 0, 500, 10)
+    df_perf = df_vendas_unicas.groupby(["Cnpj", "descFantasia", "dtInclusao"]).agg(
+        Qtd_Vendas=("Id_Venda", "count")
+    ).reset_index()
+
     df_baixa = df_perf[df_perf["Qtd_Vendas"] < limite_vendas]
 
-    colA, colB = st.columns(2)
-    colA.metric("Total Clientes Baixa Performance", len(df_baixa))
-    colB.metric("Total Vendas Baixa Performance", df_baixa["Qtd_Vendas"].sum())
-
-    st.dataframe(df_baixa[["Cnpj", "descFantasia", "dtInclusao", "Qtd_Vendas"]], use_container_width=True)
+    st.metric("Total Clientes Baixa Performance", len(df_baixa))
+    st.dataframe(df_baixa, use_container_width=True)
 
     # --- CLIENTES INSTALADOS SEM TRANSAÇÃO ---
     st.markdown("---")
