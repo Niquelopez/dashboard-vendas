@@ -113,6 +113,24 @@ if file_vendas and file_estab:
     st.metric("Total Clientes Parados", len(clientes_parados))
     st.dataframe(clientes_parados, use_container_width=True)
 
+    # --- CHURN RATE ---
+    st.markdown("---")
+    st.subheader("📉 Churn Rate")
+
+    if len(df_mensal["Venda"].unique()) > 1:
+        penultimo_mes = sorted(df_mensal["Venda"].unique())[-2]
+        ativos_penultimo = df_mensal[df_mensal["Venda"] == penultimo_mes]["Cnpj"].nunique()
+        parados = len(clientes_parados)
+
+        churn_rate = (parados / ativos_penultimo * 100) if ativos_penultimo > 0 else 0
+
+        colA, colB, colC = st.columns(3)
+        colA.metric("Clientes Ativos Penúltimo Mês", ativos_penultimo)
+        colB.metric("Clientes Pararam Último Mês", parados)
+        colC.metric("Churn Rate", f"{churn_rate:.2f}%")
+    else:
+        st.info("Ainda não há dados suficientes para calcular o churn rate.")
+
     # --- CLIENTES COM QUEDA DE RENDIMENTO ---
     st.markdown("---")
     st.subheader("📉 Clientes com Queda de Rendimento")
