@@ -132,19 +132,5 @@ if file_vendas and file_estab:
         st.dataframe(clientes_queda, use_container_width=True)
     else:
         st.info("Ainda não há dados suficientes para comparar queda de rendimento.")
-
-    # --- EXPORTAR RESULTADOS ---
-    st.markdown("---")
-    st.subheader("📤 Exportar Resultados Filtrados")
-
-    # Exporta os dados filtrados (clientes instalados desde a data escolhida)
-    csv = df_clientes_filtrados.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="⬇️ Baixar CSV com resultados filtrados",
-        data=csv,
-        file_name="resultados_filtrados.csv",
-        mime="text/csv"
-    )
-
 else:
     st.info("Faça upload das duas planilhas para visualizar o dashboard.")
