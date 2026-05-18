@@ -65,7 +65,7 @@ if file_vendas and file_estab:
     df_vendas_unicas = df.drop_duplicates(subset=["Id_Venda"])
 
     total_vendas = df_vendas_unicas.shape[0]
-    total_estab = df_estab["cnpjEmpresa"].nunique()  # agora pega direto da planilha
+    total_estab = df_estab["cnpjEmpresa"].nunique()  # pega direto da planilha
 
     col1, col2 = st.columns(2)
     col1.metric("🛒 Vendas Únicas", f"{total_vendas}")
@@ -113,24 +113,6 @@ if file_vendas and file_estab:
     st.metric("Total Clientes Parados", len(clientes_parados))
     st.dataframe(clientes_parados, use_container_width=True)
 
-    # --- CHURN RATE ---
-    st.markdown("---")
-    st.subheader("📉 Churn Rate")
-
-    if len(df_mensal["Venda"].unique()) > 1:
-        penultimo_mes = sorted(df_mensal["Venda"].unique())[-2]
-        ativos_penultimo = df_mensal[df_mensal["Venda"] == penultimo_mes]["Cnpj"].nunique()
-        parados = len(clientes_parados)
-
-        churn_rate = (parados / ativos_penultimo * 100) if ativos_penultimo > 0 else 0
-
-        colA, colB, colC = st.columns(3)
-        colA.metric("Clientes Ativos Penúltimo Mês", ativos_penultimo)
-        colB.metric("Clientes Pararam Último Mês", parados)
-        colC.metric("Churn Rate", f"{churn_rate:.2f}%")
-    else:
-        st.info("Ainda não há dados suficientes para calcular o churn rate.")
-
     # --- CLIENTES COM QUEDA DE RENDIMENTO ---
     st.markdown("---")
     st.subheader("📉 Clientes com Queda de Rendimento")
@@ -150,5 +132,19 @@ if file_vendas and file_estab:
         st.dataframe(clientes_queda, use_container_width=True)
     else:
         st.info("Ainda não há dados suficientes para comparar queda de rendimento.")
+
+    # --- EXPORTAR RESULTADOS ---
+    st.markdown("---")
+    st.subheader("📤 Exportar Resultados Filtrados")
+
+    # Exporta os dados filtrados (clientes instalados desde a data escolhida)
+    csv = df_clientes_filtrados.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label="⬇️ Baixar CSV com resultados filtrados",
+        data=csv,
+        file_name="resultados_filtrados.csv",
+        mime="text/csv"
+    )
+
 else:
     st.info("Faça upload das duas planilhas para visualizar o dashboard.")
