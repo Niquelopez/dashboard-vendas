@@ -26,7 +26,7 @@ def load_data(file_vendas, file_estab):
 
     return df, df_estab
 
-st.title("🌌 Dashboard Futurista de Performance")
+st.title("🌌 TDS Analise de Performance + ")
 
 file_vendas = st.file_uploader("Upload da Planilha A (Vendas)", type=["xlsx"])
 file_estab = st.file_uploader("Upload da Planilha B (Estabelecimentos)", type=["xlsx"])
