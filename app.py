@@ -10,6 +10,16 @@ def load_data(file_vendas, file_estab):
     df_vendas = pd.read_excel(file_vendas)
     df_estab = pd.read_excel(file_estab)
 
+    # Normalizar nomes de colunas
+    df_vendas.columns = df_vendas.columns.str.strip()
+    df_estab.columns = df_estab.columns.str.strip()
+
+    # Garantir colunas principais
+    if "Cnpj" not in df_vendas.columns and "cnpj" in df_vendas.columns:
+        df_vendas.rename(columns={"cnpj": "Cnpj"}, inplace=True)
+    if "cnpjEmpresa" not in df_estab.columns and "cnpj" in df_estab.columns:
+        df_estab.rename(columns={"cnpj": "cnpjEmpresa"}, inplace=True)
+
     df_vendas["Cnpj"] = df_vendas["Cnpj"].astype(str)
     df_estab["cnpjEmpresa"] = df_estab["cnpjEmpresa"].astype(str)
 
@@ -39,23 +49,22 @@ if file_vendas and file_estab:
     min_date = df["dtInclusao"].min()
     max_date = df["dtInclusao"].max()
 
-    date_range = st.sidebar.date_input(
-        "📅 Data de Ativação do Cliente",
-        value=(min_date, max_date),
+    # Agora apenas uma data inicial
+    data_inicio = st.sidebar.date_input(
+        "📅 Mostrar clientes instalados a partir de:",
+        value=min_date,
         min_value=min_date,
         max_value=max_date,
         format="DD/MM/YYYY"
     )
 
-    if len(date_range) == 2:
-        mask = (df["dtInclusao"].dt.date >= date_range[0]) & (df["dtInclusao"].dt.date <= date_range[1])
-        df_filtered = df.loc[mask]
-    else:
-        df_filtered = df
-
-    df_vendas_unicas = df_filtered.drop_duplicates(subset=["Id_Venda"])
+    # Filtro aplicado apenas para clientes
+    df_clientes_filtrados = df[df["dtInclusao"].dt.date >= data_inicio]
 
     # --- MÉTRICAS ---
+    # Vendas únicas sem filtro de ativação
+    df_vendas_unicas = df.drop_duplicates(subset=["Id_Venda"])
+
     total_vendas = df_vendas_unicas.shape[0]
     volume_total = df_vendas_unicas["Bruto"].sum()
     ticket_medio = volume_total / total_vendas if total_vendas > 0 else 0
@@ -103,6 +112,8 @@ if file_vendas and file_estab:
     st.subheader("🛑 Clientes Instalados sem Nenhuma Transação")
 
     clientes_instalados = df_estab[["cnpjEmpresa", "descFantasia", "dtInclusao"]].drop_duplicates()
+    clientes_instalados = clientes_instalados[clientes_instalados["dtInclusao"].dt.date >= data_inicio]
+
     clientes_com_venda = df_vendas_unicas[["Cnpj"]].drop_duplicates()
     clientes_sem_venda = clientes_instalados[~clientes_instalados["cnpjEmpresa"].isin(clientes_com_venda["Cnpj"])]
 
@@ -149,4 +160,3 @@ if file_vendas and file_estab:
         st.write(df_vendas_unicas)
 else:
     st.info("Faça upload das duas planilhas para visualizar o dashboard.")
-
