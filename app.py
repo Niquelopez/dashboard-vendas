@@ -65,7 +65,7 @@ if file_vendas and file_estab:
     df_vendas_unicas = df.drop_duplicates(subset=["Id_Venda"])
 
     total_vendas = df_vendas_unicas.shape[0]
-    total_estab = df_clientes_filtrados["cnpjEmpresa"].nunique()
+    total_estab = df_estab["cnpjEmpresa"].nunique()  # agora pega direto da planilha
 
     col1, col2 = st.columns(2)
     col1.metric("🛒 Vendas Únicas", f"{total_vendas}")
@@ -132,9 +132,5 @@ if file_vendas and file_estab:
         st.dataframe(clientes_queda, use_container_width=True)
     else:
         st.info("Ainda não há dados suficientes para comparar queda de rendimento.")
-
-    # --- DADOS BRUTOS ---
-    with st.expander("🔍 Ver dados brutos filtrados"):
-        st.write(df_vendas_unicas)
 else:
     st.info("Faça upload das duas planilhas para visualizar o dashboard.")
