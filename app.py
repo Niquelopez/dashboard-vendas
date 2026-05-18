@@ -40,10 +40,11 @@ if file_vendas and file_estab:
     max_date = df["dtInclusao"].max()
 
     date_range = st.sidebar.date_input(
-        "Data de Ativação do Cliente",
+        "📅 Data de Ativação do Cliente",
         value=(min_date, max_date),
         min_value=min_date,
-        max_value=max_date
+        max_value=max_date,
+        format="DD/MM/YYYY"
     )
 
     if len(date_range) == 2:
@@ -74,11 +75,11 @@ if file_vendas and file_estab:
     df_perf = df_perf.sort_values(by="Qtd_Vendas", ascending=False)
 
     fig = px.bar(
-        df_perf.head(20),
+        df_perf.head(10),  # reduzido para Top 10
         x="descFantasia",
         y="Qtd_Vendas",
         color="Total_Bruto",
-        title="Top 20 Clientes por Quantidade de Vendas",
+        title="Top 10 Clientes por Quantidade de Vendas",
         labels={"descFantasia": "Estabelecimento", "Qtd_Vendas": "Quantidade de Vendas"},
         color_continuous_scale="turbo"
     )
@@ -91,6 +92,10 @@ if file_vendas and file_estab:
     limite_vendas = st.slider("Ver clientes com menos vendas que:", 0, 500, 10)
     df_baixa = df_perf[df_perf["Qtd_Vendas"] < limite_vendas]
 
+    colA, colB = st.columns(2)
+    colA.metric("Total Clientes Baixa Performance", len(df_baixa))
+    colB.metric("Total Vendas Baixa Performance", df_baixa["Qtd_Vendas"].sum())
+
     st.dataframe(df_baixa[["Cnpj", "descFantasia", "dtInclusao", "Qtd_Vendas"]], use_container_width=True)
 
     # --- CLIENTES INSTALADOS SEM TRANSAÇÃO ---
@@ -101,6 +106,7 @@ if file_vendas and file_estab:
     clientes_com_venda = df_vendas_unicas[["Cnpj"]].drop_duplicates()
     clientes_sem_venda = clientes_instalados[~clientes_instalados["cnpjEmpresa"].isin(clientes_com_venda["Cnpj"])]
 
+    st.metric("Total Clientes sem Transação", len(clientes_sem_venda))
     st.dataframe(clientes_sem_venda, use_container_width=True)
 
     # --- CLIENTES QUE PARARAM DE OPERAR ---
@@ -115,6 +121,7 @@ if file_vendas and file_estab:
     ultimo_mes_cliente = df_mensal.groupby(["Cnpj", "descFantasia"])["Venda"].max().reset_index()
     clientes_parados = ultimo_mes_cliente[ultimo_mes_cliente["Venda"] < ultimo_mes]
 
+    st.metric("Total Clientes Parados", len(clientes_parados))
     st.dataframe(clientes_parados, use_container_width=True)
 
     # --- CLIENTES COM QUEDA DE RENDIMENTO ---
@@ -132,6 +139,7 @@ if file_vendas and file_estab:
 
         clientes_queda = comparativo[comparativo["Qtd_Vendas_ultimo"] < comparativo["Qtd_Vendas_penultimo"]]
 
+        st.metric("Total Clientes com Queda", len(clientes_queda))
         st.dataframe(clientes_queda, use_container_width=True)
     else:
         st.info("Ainda não há dados suficientes para comparar queda de rendimento.")
@@ -141,3 +149,4 @@ if file_vendas and file_estab:
         st.write(df_vendas_unicas)
 else:
     st.info("Faça upload das duas planilhas para visualizar o dashboard.")
+
