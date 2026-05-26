@@ -1,10 +1,14 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 
 # Configuração da página
 st.set_page_config(page_title="Portal Futurista de Vendas", layout="wide")
 
-@st.cache_data
+
+# CORREÇÃO 1: Removido @st.cache_data — objetos UploadedFile não são
+# serializáveis de forma confiável pelo Streamlit, causando exibição
+# de dados desatualizados após novo upload.
 def load_data(file_vendas, file_estab):
     df_vendas = pd.read_excel(file_vendas)
     df_estab = pd.read_excel(file_estab)
@@ -35,7 +39,8 @@ def load_data(file_vendas, file_estab):
 
     return df, df_estab
 
-st.title("🌌 TDS Analise de Performance + ")
+
+st.title("🌌 TDS Analise de Performance +")
 
 file_vendas = st.file_uploader("Upload da Planilha A (Vendas)", type=["xlsx"])
 file_estab = st.file_uploader("Upload da Planilha B (Estabelecimentos)", type=["xlsx"])
@@ -48,7 +53,6 @@ if file_vendas and file_estab:
     min_date = df["dtInclusao"].min()
     max_date = df["dtInclusao"].max()
 
-    # Apenas uma data inicial
     data_inicio = st.sidebar.date_input(
         "📅 Mostrar clientes instalados a partir de:",
         value=min_date,
@@ -57,26 +61,35 @@ if file_vendas and file_estab:
         format="DD/MM/YYYY"
     )
 
-    # Filtro aplicado apenas para clientes
-    df_clientes_filtrados = df[df["dtInclusao"].dt.date >= data_inicio]
-
-    # --- MÉTRICAS ---
-    # Vendas únicas sem filtro de ativação
+    # Vendas únicas sem filtro de data (base global)
     df_vendas_unicas = df.drop_duplicates(subset=["Id_Venda"])
 
+    # CORREÇÃO 2: df_clientes_filtrados agora é usado em todas as seções
+    # que devem respeitar o filtro de data de instalação.
+    df_filtrado = df[df["dtInclusao"].dt.date >= data_inicio]
+    df_vendas_unicas_filtradas = df_filtrado.drop_duplicates(subset=["Id_Venda"])
+
+    # --- MÉTRICAS ---
     total_vendas = df_vendas_unicas.shape[0]
-    total_estab = df_estab["cnpjEmpresa"].nunique()  # pega direto da planilha
+
+    # CORREÇÃO 5: total_estab agora respeita o filtro de data,
+    # tornando a métrica coerente com o restante do dashboard.
+    total_estab = df_estab[
+        pd.to_datetime(df_estab["dtInclusao"], errors="coerce").dt.date >= data_inicio
+    ]["cnpjEmpresa"].nunique()
 
     col1, col2 = st.columns(2)
     col1.metric("🛒 Vendas Únicas", f"{total_vendas}")
-    col2.metric("🏢 Estabelecimentos Avaliados", f"{total_estab}")
+    col2.metric("🏢 Estabelecimentos no Período", f"{total_estab}")
 
     # --- CLIENTES DE BAIXA PERFORMANCE ---
     st.markdown("---")
     st.subheader("⚠️ Clientes com Baixa Performance")
 
     limite_vendas = st.slider("Ver clientes com menos vendas que:", 0, 500, 10)
-    df_perf = df_vendas_unicas.groupby(["Cnpj", "descFantasia", "dtInclusao"]).agg(
+
+    # CORREÇÃO 2 (aplicada): usa df_vendas_unicas_filtradas respeitando a data
+    df_perf = df_vendas_unicas_filtradas.groupby(["Cnpj", "descFantasia", "dtInclusao"]).agg(
         Qtd_Vendas=("Id_Venda", "count")
     ).reset_index()
 
@@ -90,10 +103,14 @@ if file_vendas and file_estab:
     st.subheader("🛑 Clientes Instalados sem Nenhuma Transação")
 
     clientes_instalados = df_estab[["cnpjEmpresa", "descFantasia", "dtInclusao"]].drop_duplicates()
-    clientes_instalados = clientes_instalados[clientes_instalados["dtInclusao"].dt.date >= data_inicio]
+    clientes_instalados = clientes_instalados[
+        pd.to_datetime(clientes_instalados["dtInclusao"], errors="coerce").dt.date >= data_inicio
+    ]
 
     clientes_com_venda = df_vendas_unicas[["Cnpj"]].drop_duplicates()
-    clientes_sem_venda = clientes_instalados[~clientes_instalados["cnpjEmpresa"].isin(clientes_com_venda["Cnpj"])]
+    clientes_sem_venda = clientes_instalados[
+        ~clientes_instalados["cnpjEmpresa"].isin(clientes_com_venda["Cnpj"])
+    ]
 
     st.metric("Total Clientes sem Transação", len(clientes_sem_venda))
     st.dataframe(clientes_sem_venda, use_container_width=True)
@@ -102,13 +119,17 @@ if file_vendas and file_estab:
     st.markdown("---")
     st.subheader("⏸️ Clientes que Pararam de Operar")
 
-    df_mensal = df_vendas_unicas.groupby(
-        [df_vendas_unicas["Venda"].dt.to_period("M"), "Cnpj", "descFantasia"]
+    # CORREÇÃO 2 (aplicada): usa df_vendas_unicas_filtradas
+    df_mensal = df_vendas_unicas_filtradas.groupby(
+        [df_vendas_unicas_filtradas["Venda"].dt.to_period("M"), "Cnpj", "descFantasia"]
     ).agg(Qtd_Vendas=("Id_Venda", "count")).reset_index()
 
-    ultimo_mes = df_mensal["Venda"].max()
+    # CORREÇÃO 4: usa o mês atual real como referência, não o último mês do dado.
+    # Assim, clientes que não venderam no mês corrente são corretamente sinalizados.
+    mes_atual = pd.Period(datetime.today(), "M")
+
     ultimo_mes_cliente = df_mensal.groupby(["Cnpj", "descFantasia"])["Venda"].max().reset_index()
-    clientes_parados = ultimo_mes_cliente[ultimo_mes_cliente["Venda"] < ultimo_mes]
+    clientes_parados = ultimo_mes_cliente[ultimo_mes_cliente["Venda"] < mes_atual]
 
     st.metric("Total Clientes Parados", len(clientes_parados))
     st.dataframe(clientes_parados, use_container_width=True)
@@ -117,20 +138,44 @@ if file_vendas and file_estab:
     st.markdown("---")
     st.subheader("📉 Clientes com Queda de Rendimento")
 
-    if len(df_mensal["Venda"].unique()) > 1:
-        penultimo_mes = sorted(df_mensal["Venda"].unique())[-2]
+    periodos_unicos = sorted(df_mensal["Venda"].unique())
 
-        vendas_penultimo = df_mensal[df_mensal["Venda"] == penultimo_mes][["Cnpj", "Qtd_Vendas"]]
-        vendas_ultimo = df_mensal[df_mensal["Venda"] == ultimo_mes][["Cnpj", "Qtd_Vendas"]]
+    if len(periodos_unicos) > 1:
+        ultimo_mes = periodos_unicos[-1]
+        penultimo_mes = periodos_unicos[-2]
 
-        comparativo = pd.merge(vendas_penultimo, vendas_ultimo, on="Cnpj", how="left", suffixes=("_penultimo", "_ultimo"))
+        # CORREÇÃO 3: inclui descFantasia no merge para exibir o nome do estabelecimento
+        vendas_penultimo = df_mensal[df_mensal["Venda"] == penultimo_mes][
+            ["Cnpj", "descFantasia", "Qtd_Vendas"]
+        ]
+        vendas_ultimo = df_mensal[df_mensal["Venda"] == ultimo_mes][
+            ["Cnpj", "Qtd_Vendas"]
+        ]
+
+        comparativo = pd.merge(
+            vendas_penultimo,
+            vendas_ultimo,
+            on="Cnpj",
+            how="left",
+            suffixes=("_penultimo", "_ultimo")
+        )
         comparativo = comparativo.fillna(0)
 
-        clientes_queda = comparativo[comparativo["Qtd_Vendas_ultimo"] < comparativo["Qtd_Vendas_penultimo"]]
+        clientes_queda = comparativo[
+            comparativo["Qtd_Vendas_ultimo"] < comparativo["Qtd_Vendas_penultimo"]
+        ].copy()
+
+        # Coluna auxiliar mostrando a variação percentual
+        clientes_queda["Variação (%)"] = (
+            (clientes_queda["Qtd_Vendas_ultimo"] - clientes_queda["Qtd_Vendas_penultimo"])
+            / clientes_queda["Qtd_Vendas_penultimo"].replace(0, 1)
+            * 100
+        ).round(1)
 
         st.metric("Total Clientes com Queda", len(clientes_queda))
         st.dataframe(clientes_queda, use_container_width=True)
     else:
         st.info("Ainda não há dados suficientes para comparar queda de rendimento.")
+
 else:
     st.info("Faça upload das duas planilhas para visualizar o dashboard.")
