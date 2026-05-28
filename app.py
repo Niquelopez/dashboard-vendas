@@ -90,8 +90,9 @@ if file_vendas and file_estab:
 
     # CORREÇÃO 2 (aplicada): usa df_vendas_unicas_filtradas respeitando a data
     df_perf = df_vendas_unicas_filtradas.groupby(["Cnpj", "descFantasia", "dtInclusao"]).agg(
-        Qtd_Vendas=("Id_Venda", "count")
-    ).reset_index()
+    Qtd_Vendas=("Id_Venda", "count"),
+    Ultima_Transacao=("Venda", "max")
+).reset_index()
 
     df_baixa = df_perf[df_perf["Qtd_Vendas"] < limite_vendas]
 
